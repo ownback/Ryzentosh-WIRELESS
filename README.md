@@ -16,4 +16,4 @@ AMD Ryzen 9 7900X3D · Radeon RX 7900 XTX (XFX) · ASUS ROG STRIX B650E-I · mac
 ## Contributing
 See [CONTRIBUTING.md](https://github.com/ownback/Ryzentosh/blob/main/CONTRIBUTING.md). AI agents: read [AGENTS.md](AGENTS.md).
 
-License: GPL-2.0-only. Third-party code and its origins are listed in [PROVENANCE.md](PROVENANCE.md).
+License: GPL-3.0-only (relicensed from GPL-2.0-only on 2026-11-27, before any code existed, so it can build on AirportMtkWlan, which has GPL-3.0-only files). Third-party code and its origins are listed in [PROVENANCE.md](PROVENANCE.md).
