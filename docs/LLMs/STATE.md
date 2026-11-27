@@ -1,6 +1,6 @@
 # STATE: Ryzentosh-WIRELESS
 
-Updated: 2026-11-27 ~23:10 by the Project Lead for WIRELESS#3 (claude-opus-5-5/high).
+Updated: 2026-11-27 ~23:20 by the Project Lead for WIRELESS#3 (claude-opus-5-5/high).
 
 ## Phase
 Research → ADR (RB-W1, WIRELESS#3). No kext code yet.
@@ -20,10 +20,10 @@ Research → ADR (RB-W1, WIRELESS#3). No kext code yet.
 - owl (seemoo-lab) is GPL-3.0-or-later in 30/41 files: copyable per file once the Orchestrator lifts its study-only marker/registry entry and the licence audit (W11) signs off.
 
 ## In flight
-- Draft PR https://github.com/ownback/Ryzentosh-WIRELESS/pull/4. Fable review 1: CHANGES-REQUESTED (4 blockers: NVRAM keys widened the exception, unevidenced fail-closed claim, wrong BT transport model, overstated isolation) → all addressed in revision 2; re-check pending.
+- PR https://github.com/ownback/Ryzentosh-WIRELESS/pull/4 (ready for review). Fable: review 1 CHANGES-REQUESTED → rev 2 → re-check APPROVE. Waiting for the Orchestrator to decide ADR-0001 and merge.
 
 ## Next step
-Fable review → fix → mark ready → Orchestrator decides the ADR. Then file issues W2-W11. Owner tests T1-T3 (no reboot) whenever the owner has time.
+After the ADR is accepted: file issues W2-W11 from the ADR table, then start W2 (ABI headers, REA) and W7 (BT loader). Owner tests T1-T3 (no reboot) whenever the owner has time; T1 (AP on ch 36-48, AirDrop) confirms the AirDrop root cause.
 
 ## Blockers
 - Owner confirmation needed (via the Orchestrator): "fork base" read as MtkWireless 1.1.3 = reference baseline only, code built from ISC/BSD primaries (ADR-0001 option C).
