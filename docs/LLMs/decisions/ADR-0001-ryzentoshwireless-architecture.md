@@ -162,18 +162,20 @@ UUID allowlist and class-size table, bluetoothd signature matcher against the pi
 
 ## First implementation issues
 
+Filed 2026-11-27 as #5–#14.
+
 | # | Title | Depends on |
 |---|---|---|
-| W2 | IO80211/IOSkywalk 25G241 ABI: generate headers from the KDK; guard = build + Family UUID allowlist, then class sizes; host test | — (REA) |
-| W3 | MT7922 chip bring-up: PCIe, WFDMA, MCU, Wi-Fi firmware download, reset coordinator (mt76 port) | W2 for the kext shell |
-| W4 | Infra STA: RE the Family's join/key contract first (who runs the 4-way handshake and SAE), then scan, join WPA2/WPA3-SAE/PMF, Skywalk data path; meet the 1.1.3 baseline | W3 |
-| W5 | Regulatory: real country/CLC, `apple80211` locale | W3 |
-| W6 | AWDL engine: host schedule over ROC, AP power-save handshake, DFS-AP case, peer data path without routes (RB-W1 Q2/Q3) | W4, W5 |
-| W7 | Bluetooth: btmtk firmware loader for `0489:e0e2` + bluetoothd patch (named workaround, build flag `RZW_BTD_PATCH` + a non-boot-arg runtime off switch, fail-closed) from our own 25G241 RE | — |
-| W8 | RB: Apple Bluetooth vendor commands that Continuity needs, what bluetoothd does when they fail, and the options (each needs an owner decision, component 8) (RB-W1 Q4) | W7 |
-| W9 | iPhone Bluetooth connection: root cause from an HCI trace (owner test T2), the `Unknown chipset 0` relaunch (RB-W1 Q5), and whether the two legacy NVRAM keys are needed | owner test T2 |
-| W10 | On-device test scripts for the table above (networkQuality, ping, AirDrop/Clipboard trial logger, BT log counters) | — |
-| W11 | Licence audit: AirportMtkWlan per-file provenance (incl. whether GPLv2 §9 lets unversioned itlwm-lineage files be upgraded), MtkWirelessBT/BlueToolFixup lineage, owl per file, `LICENCE.mediatek` and a firmware blob in a GPL binary | — |
+| [W2](https://github.com/ownback/Ryzentosh-WIRELESS/issues/5) | IO80211/IOSkywalk 25G241 ABI: generate headers from the KDK; guard = build + Family UUID allowlist, then class sizes; host test | — (REA) |
+| [W3](https://github.com/ownback/Ryzentosh-WIRELESS/issues/6) | MT7922 chip bring-up: PCIe, WFDMA, MCU, Wi-Fi firmware download, reset coordinator (mt76 port) | W2 for the kext shell |
+| [W4](https://github.com/ownback/Ryzentosh-WIRELESS/issues/7) | Infra STA: RE the Family's join/key contract first (who runs the 4-way handshake and SAE), then scan, join WPA2/WPA3-SAE/PMF, Skywalk data path; meet the 1.1.3 baseline | W3 |
+| [W5](https://github.com/ownback/Ryzentosh-WIRELESS/issues/8) | Regulatory: real country/CLC, `apple80211` locale | W3 |
+| [W6](https://github.com/ownback/Ryzentosh-WIRELESS/issues/9) | AWDL engine: host schedule over ROC, AP power-save handshake, DFS-AP case, peer data path without routes (RB-W1 Q2/Q3) | W4, W5 |
+| [W7](https://github.com/ownback/Ryzentosh-WIRELESS/issues/10) | Bluetooth: btmtk firmware loader for `0489:e0e2` + bluetoothd patch (named workaround, build flag `RZW_BTD_PATCH` + a non-boot-arg runtime off switch, fail-closed) from our own 25G241 RE | — |
+| [W8](https://github.com/ownback/Ryzentosh-WIRELESS/issues/11) | RB: Apple Bluetooth vendor commands that Continuity needs, what bluetoothd does when they fail, and the options (each needs an owner decision, component 8) (RB-W1 Q4) | W7 |
+| [W9](https://github.com/ownback/Ryzentosh-WIRELESS/issues/12) | iPhone Bluetooth connection: root cause from an HCI trace (owner test T2), the `Unknown chipset 0` relaunch (RB-W1 Q5), and whether the two legacy NVRAM keys are needed | owner test T2 |
+| [W10](https://github.com/ownback/Ryzentosh-WIRELESS/issues/13) | On-device test scripts for the table above (networkQuality, ping, AirDrop/Clipboard trial logger, BT log counters) | — |
+| [W11](https://github.com/ownback/Ryzentosh-WIRELESS/issues/14) | Licence audit: AirportMtkWlan per-file provenance (incl. whether GPLv2 §9 lets unversioned itlwm-lineage files be upgraded), MtkWirelessBT/BlueToolFixup lineage, owl per file, `LICENCE.mediatek` and a firmware blob in a GPL binary | — |
 
 Owner tests that need no reboot and can run now (RB-W1 §4): **T1** AirDrop with the AP on a non-DFS channel, **T2** iPhone
 pairing with an HCI trace, **T3** Clipboard tries with link-type logging.

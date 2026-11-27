@@ -4,8 +4,10 @@
 
 **Release artifact:** RyzentoshWireless.kext (one binary).
 
-**Depends on:** [Ryzentosh-EFI]
+**Replaces in the EFI (when it passes on hardware):** MtkWirelessWifi, MtkWirelessBT, BlueToolFixup. Lilu stays (the bluetoothd patch needs it).
+
+**Depends on:** Ryzentosh-EFI (delivery; the Orchestrator stages every candidate).
 
 **Parity targets:** see the rows for this project in the control plane's COMPATIBILITY_MATRIX.md.
 
-**Out of scope:** anything another Ryzentosh repo owns (see projects.yaml).
+**Out of scope:** anything another Ryzentosh repo owns (see projects.yaml). One repo ships one kext: graphics and media decode, including Continuity Camera's video decode, belong to Ryzentosh-GPU (dGPU + iGPU). The MCE blocker and the HV backend belong to Ryzentosh-CPU. NVMe, the USB map and RestrictEvents belong to Ryzentosh-PLATFORM. Every SSDT belongs to Ryzentosh-ACPI.
