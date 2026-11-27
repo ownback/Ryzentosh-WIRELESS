@@ -1,6 +1,7 @@
 # ADR-0001: RyzentoshWireless.kext architecture and what it is built from
 
-Status: **proposed** (2026-11-27). Proposed by: Project Lead (claude-opus-5-5/high). Reviewed by claude-fable-5-2 (first pass CHANGES-REQUESTED,
+Status: **accepted** (owner direction 2026-11-27, "we just make our own Ryzentosh-WIRELESS", confirmed by the Root
+Orchestrator). Proposed by: Project Lead (claude-opus-5-5/high). Reviewed by claude-fable-5-2 (first pass CHANGES-REQUESTED,
 addressed in revision 2). The
 owner decisions it rests on are already recorded in the control plane's `docs/LLMs/DECISIONS.md` (one repo, one kext;
 GPL-3.0-only; MtkWirelessWifi study-only; the bluetoothd patch as the named essential workaround).
@@ -40,8 +41,8 @@ Evidence: [RB-W1](../re/RB-W1-wireless-architecture.md). Issue: [WIRELESS#3](htt
 
 "Base" in the owner's plan (ROADMAP M5: "the one that gets furthest and works best") is therefore **MtkWireless 1.1.3 as
 the reference and baseline**. It is the bar to beat, and a source of facts (what the hardware and macOS needed, cited by
-commit and path), never of code. **This reading of "pick the fork base" needs the owner's confirmation** (no fork:
-MtkWireless can't be forked and AirportMtkWlan lost on hardware).
+commit and path), never of code. The owner confirmed this reading of "pick the fork base" on 2026-11-27: no fork.
+MtkWireless can't be forked, and AirportMtkWlan lost on hardware.
 
 ## Decision
 
@@ -76,7 +77,7 @@ macOS build and re-validation of the allowlist before any macOS update is approv
 | 3 | `io80211` | `RyzentoshWLANController`, infra interface (`IO80211InfraProtocol`), AWDL interface (`IO80211AWDLProtocol`), Skywalk queues. Our own headers generated from the 25G241 KDK, with an **ABI guard** at probe: build + IO80211Family/IOSkywalkFamily UUID allowlist, then class sizes (the class-size part is the WTLWireless pattern, ISC, re-implemented) | KDK RE (REA), Apple's class choice from AppleBCMWLANCoreMac |
 | 4 | `wlan/mlme` | 802.11 state below the Family's WCL: auth/assoc frames, RSN (WPA2-PSK, WPA3-SAE, PMF). **Where the supplicant lives is open:** Apple's driver has `useAppleRSNSupplicant()`, `setCIPHER_KEY`, `getCUR_PMK`, `isSaeH2eEnabled`, and the Family has a 4-way-handshake timeout, so the Family may run it. W4 settles the join/key contract by RE before any supplicant code is written | OpenBSD net80211 (ISC/BSD), IEEE 802.11-2020 for SAE, only if W4 shows the driver must do it |
 | 5 | `regd` | real country and regulatory limits: CLC/SKU from the chip, 802.11d, mapping to `apple80211` locale. Needed for correct AWDL channel choice (RB-W1 §3.4) | mt76 `mt7921_mcu_set_clc` (ISC) |
-| 6 | `awdl` | **host AWDL engine**: mirrors the Family's schedule selectors (sync params, channel sequence, election, presence), executes availability windows through component 2's ROC/channel contexts, AP power-save handshake around off-channel windows, DFS and regulatory channel policy, peer data path and the peer signals the Family needs (no driver-installed routes, RB-W1 §3.4) | Apple behaviour from KDK RE; AWDL protocol from seemoo-lab OWL (papers, and `owl` source: GPL-3.0-or-later in 30 of 41 files, so copyable per file); MtkWireless docs as measured facts |
+| 6 | `awdl` | **host AWDL engine**: mirrors the Family's schedule selectors (sync params, channel sequence, election, presence), executes availability windows through component 2's ROC/channel contexts, AP power-save handshake around off-channel windows, DFS and regulatory channel policy, peer data path and the peer signals the Family needs (no driver-installed routes, RB-W1 §3.4) | Apple behaviour from KDK RE; AWDL protocol from seemoo-lab OWL (papers, and `owl` source: GPL-3.0-or-later per file, copyable per file); MtkWireless docs as measured facts |
 | 7 | `bt` | USB firmware download (WMT) and the controller's power and reset. After that, **bluetoothd itself drives the controller from user space** through an `AppleUSBHostDeviceUserClient` on the device and `AppleUSBHostInterfaceUserClient`s on the ACL and SCO interfaces (`UsbExclusiveOwner = bluetoothd`) (live ioreg; the KDK's IOBluetoothFamily has no USB-transport symbols). So the kext doesn't sit in the HCI path | port of Linux `btmtk.c` (ISC) |
 | 8 | `bt/hci` | research only (issue W8): what Continuity loses when the controller refuses Apple vendor commands, and whether anything can serve them. Because the HCI path is bluetoothd ↔ USB user client, any translation would need either more bluetoothd patches or a proxy USB device. **Neither is covered by the owner's exception**, so W8 ends in an owner decision, not in code | — |
 | 9 | `bluetoothd` | **the named essential workaround**: Lilu user-space patches that make bluetoothd accept a non-Apple controller. Minimal patch set, each site matched by signature against the pinned build, fail-closed (unknown build → no patch; what bluetoothd then does with the controller is measured in W7, not assumed), behind a build-time feature flag (`RZW_BTD_PATCH`, on in releases; W7 also defines a runtime off switch that is not a boot-arg), tracked by its own issue | our own RE of the 25G241 bluetoothd (REA). BlueToolFixup (BrcmPatchRAM: GitHub reports GPL-2.0) and MtkWirelessBT are study-only until the license-auditor traces them |
@@ -109,7 +110,7 @@ rules on the exact licence text and on a firmware blob inside a GPL binary. A Ma
 | Linux mt76 (`mt7921/*`, `mt792x_*`, `mt76_connac*`), Linux `btmtk.c` (ISC, v6.18) | port | keep copyright + ISC text in `NOTICE.md`; `PROVENANCE.md` row per file (commit, path, function) |
 | OpenBSD net80211 / mwx(4) (ISC/BSD) | port | the same |
 | WTLWireless (ISC), mt7925-macos (BSD-3-Clause-Clear), owly (MIT) | port patterns, mostly ideas; copy only with notices | the same |
-| owl (seemoo-lab) | copy/port files that say GPL-3.0-or-later (30 of 41); check the rest per file. Copyable once the Orchestrator lifts the `.RYZENTOSH-STUDY-ONLY` marker and the registry entry, and W11 signs off | keep notices |
+| owl (seemoo-lab) | copy/port its 34 GPL-3.0-or-later project files (control-plane registry, 2026-11-27; marker `.RYZENTOSH-COPY-PER-FILE`). The vendored files (`log.c` MIT, hashmap, siphash24, crc32, circular_buffer) stay under their own terms: check each | SPDX + PROVENANCE row per file, keep notices |
 | Lilu (BSD-3-Clause; `plugin_start.cpp` is compiled into the plugin) | link and compile its plugin glue | BSD notice in `NOTICE.md` |
 | Linux mac80211, cfg80211, `ieee80211.h` (GPL-2.0-only) | study only | — |
 | AirportMtkWlan | copy only files with their own GPL-3.0-compatible SPDX line, after the license-auditor traces them; otherwise study | per file |
