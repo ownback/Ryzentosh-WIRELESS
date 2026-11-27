@@ -191,9 +191,9 @@ Facts:
 - The Bluetooth stack was the same in all three tests: MtkWirelessBT 1.1.1 + BlueToolFixup in step 0 and E-WiFi (that PR
   changed only `Kernel/Add[5]`, the Wi-Fi kext), MtkWirelessBT 1.1.3 in E-WiFi2. So "flaky on every driver" fits a cause
   outside the Wi-Fi kext.
-- In the first 46 minutes of this boot, bluetoothd logged `advertisingParametersCb Could not start advertising : STATUS
-  712` 11 times, `Advertising failed to start … peripheral manager isn't powered on` 8 times, and `addScanFilterByUUID
-  failed` / `Failed to add rule` about 120 times. The rules it can't add are Apple controller features
+- Between 21:30 and 22:20 on this boot, bluetoothd logged `advertisingParametersCb Could not start advertising : STATUS
+  712` 11 times, `Advertising failed to start … peripheral manager isn't powered on` 9 times (around the relaunch in
+  4.3), and the pair `addScanFilterByUUID failed` + `Failed to add rule` 245 times. The rules it can't add are Apple controller features
   (`BD_VSC_LE_META_ADD_ADV_MATCHING_RULE`, `…_ADV_PCF_SERVICE_UUID`, `…_ENA_FILTERING_FEATURES`). A MediaTek controller
   doesn't implement them.
 - Handoff and Clipboard announce themselves over BLE advertising, and Clipboard's payload is fetched peer-to-peer. With
