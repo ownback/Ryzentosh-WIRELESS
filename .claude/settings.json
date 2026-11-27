@@ -2,16 +2,55 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "hooks": {
     "SessionStart": [
-      { "hooks": [ { "type": "command", "command": "/usr/bin/python3 \"$HOME/Projects/Ryzentosh/.claude/hooks/session_start.py\"" } ] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$HOME/Projects/Ryzentosh/.claude/hooks/session_start.py\""
+          }
+        ]
+      }
     ],
     "PreToolUse": [
-      { "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
-        "hooks": [ { "type": "command", "command": "/usr/bin/python3 \"$HOME/Projects/Ryzentosh/.claude/hooks/guard_paths.py\"" } ] },
-      { "matcher": "Bash",
-        "hooks": [ { "type": "command", "command": "/usr/bin/python3 \"$HOME/Projects/Ryzentosh/.claude/hooks/guard_secrets.py\"" } ] }
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$HOME/Projects/Ryzentosh/.claude/hooks/guard_paths.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$HOME/Projects/Ryzentosh/.claude/hooks/guard_secrets.py\""
+          }
+        ]
+      }
     ],
     "Stop": [
-      { "hooks": [ { "type": "command", "command": "/usr/bin/python3 \"$HOME/Projects/Ryzentosh/.claude/hooks/stop_state.py\"" } ] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$HOME/Projects/Ryzentosh/.claude/hooks/stop_state.py\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$HOME/Projects/Ryzentosh/.claude/hooks/reindex.py\""
+          }
+        ]
+      }
     ]
   }
 }
