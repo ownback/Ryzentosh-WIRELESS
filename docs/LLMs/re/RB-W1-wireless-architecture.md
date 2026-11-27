@@ -175,8 +175,8 @@ Evidence chain, MtkWireless at `424f976`:
 3. The live AP is on channel 52 (`logs-local/ewifi*/…airport.txt`), and `amtk_awdl_offchan=0` is in the boot-args.
 4. Live counters on `AirportMtkAwdlInterface`, MtkWireless 1.1.3, this boot (ioreg, ~22:55): `MTKAWDLInfraSlotChannel =
    52`, `MTKAWDLAWStartNotifications = 0`, `MTKAWDLDataTxSubmitted = 0`, `MTKAWDLDataTxExpired = 255`,
-   `MTKAWDLNativeTxPackets = 257`. AWDL is pinned to the DFS AP channel, no availability window ever started, and every
-   queued AWDL data frame expired unsent.
+   `MTKAWDLNativeTxPackets = 257`. AWDL is pinned to the DFS AP channel, no availability window ever started, and 255 of
+   257 queued AWDL data frames expired unsent.
 
 So AWDL has no usable channel: the AP channel is DFS (refused), and every other channel is forbidden by the boot-arg.
 AirDrop discovery is BLE plus AWDL service announcements, and the BLE half works. The transfer needs AWDL data frames and
@@ -264,7 +264,7 @@ local in the control plane's `.private/` because it contains device addresses.
 
 - **Q1 (W2):** exact 25G241 vtable layout and class sizes of `IO80211Controller`, `IO80211InfraProtocol`,
   `IO80211AWDLProtocol`, `IO80211SkywalkInterface` and the Skywalk queues, generated from the KDK with REA, with a
-  class-size guard like WTLWireless's.
+  guard on build + Family UUIDs first and class sizes second (WTLWireless checks sizes).
 - **Q2 (W6):** what the Family needs to see for an AWDL peer (peer add events, `setAWDL_PEER_TRAFFIC_REGISTRATION`, data-path
   enable) so that awdl0 IPv6 and neighbour resolution work without driver-installed routes.
 - **Q3 (W6):** which missing selectors (3.2) each Continuity feature uses: AWDL encryption for Sidecar/Universal Control,

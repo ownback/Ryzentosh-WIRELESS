@@ -17,7 +17,7 @@ Research → ADR (RB-W1, WIRELESS#3). No kext code yet.
 - AirportMtkWlan's GPL-3.0 grant covers GPLv2-inherited code; copy only per-file-traced files. mt76 mt7921/mt792x and btmtk.c are ISC (v6.18). BrcmPatchRAM (BlueToolFixup) is GPL-2.0 per GitHub → study-only until audited.
 
 - Bluetooth: bluetoothd drives the controller from user space (USB user clients), so a kext can't sit in the HCI path; Apple-VSC emulation would need more bluetoothd patches or a proxy device (outside the owner's exception → W8 ends in an owner decision).
-- owl (seemoo-lab) is GPL-3.0-or-later in 30/41 files: copyable per file. The control-plane registry says study-only (stale; Orchestrator to fix).
+- owl (seemoo-lab) is GPL-3.0-or-later in 30/41 files: copyable per file once the Orchestrator lifts its study-only marker/registry entry and the licence audit (W11) signs off.
 
 ## In flight
 - Draft PR https://github.com/ownback/Ryzentosh-WIRELESS/pull/4. Fable review 1: CHANGES-REQUESTED (4 blockers: NVRAM keys widened the exception, unevidenced fail-closed claim, wrong BT transport model, overstated isolation) → all addressed in revision 2; re-check pending.
