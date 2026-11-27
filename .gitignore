@@ -1,0 +1,10 @@
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+._*
+/temp/
+/.private/
+.claude/settings.local.json
+.claude/worktrees/

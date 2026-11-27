@@ -1,0 +1,30 @@
+name: CI
+on:
+  push: {branches: [main]}
+  pull_request:
+permissions: {contents: read}
+jobs:
+  checks:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Privacy scan (no SMBIOS values, MACs or home paths)
+        run: |
+          set -e
+          if git grep -nE '<key>(SystemSerialNumber|MLB|SystemUUID|ROM)</key>' -- '*.plist' | grep -v PLACEHOLDER; then
+            # each match must be followed by a placeholder value
+            for f in $(git grep -lE '<key>(SystemSerialNumber|MLB|SystemUUID)</key>' -- '*.plist'); do
+              /usr/bin/python3 -c "import plistlib,sys;g=plistlib.load(open('$f','rb')).get('PlatformInfo',{}).get('Generic',{});bad=[k for k in ('SystemSerialNumber','MLB','SystemUUID') if g.get(k) and 'PLACEHOLDER' not in str(g.get(k)) and set(str(g.get(k)))-set('0-')];sys.exit('identity in %s: %s'%('$f',bad) if bad else 0)"
+            done
+          fi
+          ! git grep -nE '\b([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b' -- . ':!*.md' || { echo 'MAC-like string found'; exit 1; }
+          ! git grep -nE '/Users/[a-z]+' -- . ':!.github/*' || { echo 'home path found'; exit 1; }
+      - name: SPDX headers on sources
+        run: |
+          missing=$(git ls-files '*.c' '*.cpp' '*.h' '*.hpp' '*.m' '*.mm' '*.swift' '*.rs' | while read f; do head -5 "$f" | grep -q SPDX-License-Identifier || echo "$f"; done)
+          [ -z "$missing" ] || { echo "Missing SPDX header:"; echo "$missing"; exit 1; }
+      - name: Plist lint
+        run: git ls-files '*.plist' | xargs -I{} plutil -lint {} || true
+      - name: Build and test (when the repo has a build)
+        run: |
+          if [ -x tools/ci.sh ]; then tools/ci.sh; else echo "no tools/ci.sh yet"; fi

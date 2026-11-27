@@ -1,0 +1,21 @@
+name: Bug report
+description: Something behaves differently from a real Mac
+labels: [bug, triage]
+body:
+  - type: textarea
+    id: expected
+    attributes: {label: What a real Mac does, description: The parity target}
+    validations: {required: true}
+  - type: textarea
+    id: actual
+    attributes: {label: What happens instead}
+    validations: {required: true}
+  - type: textarea
+    id: repro
+    attributes: {label: Steps to reproduce}
+  - type: input
+    id: build
+    attributes: {label: macOS build and component version, placeholder: "25G241, Ryzentosh-WIRELESS v0.1.0"}
+  - type: textarea
+    id: logs
+    attributes: {label: Logs (sanitized), description: "No serials, MAC addresses or SMBIOS identity", render: text}

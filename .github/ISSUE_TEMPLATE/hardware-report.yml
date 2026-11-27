@@ -1,0 +1,25 @@
+name: Hardware report
+description: Report how this component behaves on your hardware (other RX 7900 XTX / AM5 owners welcome)
+labels: [hardware-report]
+body:
+  - type: input
+    id: gpu
+    attributes: {label: GPU and subsystem ID, placeholder: "RX 7900 XTX, 1002:744c rev c8, subsys 1eae:7901"}
+  - type: input
+    id: vbios
+    attributes: {label: VBIOS version}
+  - type: input
+    id: board
+    attributes: {label: Motherboard and BIOS version}
+  - type: input
+    id: monitor
+    attributes: {label: Monitor model (or EDID PNP and product code)}
+  - type: input
+    id: macos
+    attributes: {label: macOS build and OpenCore version}
+  - type: textarea
+    id: report
+    attributes: {label: Sanitized boot report or inventory, description: "Output of tools/inventory.py (docs/Hardware/DEVICE_INVENTORY.md). Never include serials or MAC addresses.", render: text}
+  - type: textarea
+    id: result
+    attributes: {label: What worked and what didn't}
