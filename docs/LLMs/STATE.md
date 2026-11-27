@@ -1,6 +1,6 @@
 # STATE: Ryzentosh-WIRELESS
 
-Updated: 2026-11-27 ~22:50 by the Project Lead for WIRELESS#3 (claude-opus-5-5/high).
+Updated: 2026-11-27 ~23:10 by the Project Lead for WIRELESS#3 (claude-opus-5-5/high).
 
 ## Phase
 Research → ADR (RB-W1, WIRELESS#3). No kext code yet.
@@ -16,11 +16,14 @@ Research → ADR (RB-W1, WIRELESS#3). No kext code yet.
 - Continuity Camera wired: not WIRELESS (VideoToolbox reports HEVC HW decode true, H.264 false) → GPU.
 - AirportMtkWlan's GPL-3.0 grant covers GPLv2-inherited code; copy only per-file-traced files. mt76 mt7921/mt792x and btmtk.c are ISC (v6.18). BrcmPatchRAM (BlueToolFixup) is GPL-2.0 per GitHub → study-only until audited.
 
+- Bluetooth: bluetoothd drives the controller from user space (USB user clients), so a kext can't sit in the HCI path; Apple-VSC emulation would need more bluetoothd patches or a proxy device (outside the owner's exception → W8 ends in an owner decision).
+- owl (seemoo-lab) is GPL-3.0-or-later in 30/41 files: copyable per file. The control-plane registry says study-only (stale; Orchestrator to fix).
+
 ## In flight
-- Draft PR for RB-W1 + ADR-0001 (branch `research/3-wireless-architecture`); Fable review pending.
+- Draft PR https://github.com/ownback/Ryzentosh-WIRELESS/pull/4. Fable review 1: CHANGES-REQUESTED (4 blockers: NVRAM keys widened the exception, unevidenced fail-closed claim, wrong BT transport model, overstated isolation) → all addressed in revision 2; re-check pending.
 
 ## Next step
 Fable review → fix → mark ready → Orchestrator decides the ADR. Then file issues W2-W11. Owner tests T1-T3 (no reboot) whenever the owner has time.
 
 ## Blockers
-None.
+- Owner confirmation needed (via the Orchestrator): "fork base" read as MtkWireless 1.1.3 = reference baseline only, code built from ISC/BSD primaries (ADR-0001 option C).

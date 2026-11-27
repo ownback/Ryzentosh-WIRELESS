@@ -1,6 +1,7 @@
 # ADR-0001: RyzentoshWireless.kext architecture and what it is built from
 
-Status: **proposed** (2026-11-27). Decided by: Project Lead (claude-opus-5-5/high), with review by claude-fable-5-2. The
+Status: **proposed** (2026-11-27). Proposed by: Project Lead (claude-opus-5-5/high). Reviewed by claude-fable-5-2 (first pass CHANGES-REQUESTED,
+addressed in revision 2). The
 owner decisions it rests on are already recorded in the control plane's `docs/LLMs/DECISIONS.md` (one repo, one kext;
 GPL-3.0-only; MtkWirelessWifi study-only; the bluetoothd patch as the named essential workaround).
 Evidence: [RB-W1](../re/RB-W1-wireless-architecture.md). Issue: [WIRELESS#3](https://github.com/ownback/Ryzentosh-WIRELESS/issues/3).
@@ -39,7 +40,8 @@ Evidence: [RB-W1](../re/RB-W1-wireless-architecture.md). Issue: [WIRELESS#3](htt
 
 "Base" in the owner's plan (ROADMAP M5: "the one that gets furthest and works best") is therefore **MtkWireless 1.1.3 as
 the reference and baseline**. It is the bar to beat, and a source of facts (what the hardware and macOS needed, cited by
-commit and path), never of code.
+commit and path), never of code. **This reading of "pick the fork base" needs the owner's confirmation** (no fork:
+MtkWireless can't be forked and AirportMtkWlan lost on hardware).
 
 ## Decision
 
@@ -54,43 +56,51 @@ commit and path), never of code.
 | bluetoothd patch | `IOResources`, Lilu plugin entry | `RyzentoshBTPatcher` |
 
 `OSBundleLibraries`: the IO80211Family, IOSkywalkFamily, IONetworkingFamily, IOPCIFamily and IOUSBHostFamily libraries
-Apple's driver uses (RB-W1 §2.1), plus Lilu (`as.vit9696.Lilu`). The personalities start independently. If the IO80211
-ABI guard (component 3) declines on an unknown build, only Wi-Fi stays down and Bluetooth still runs. `MinKernel` /
-`MaxKernel` = `25.0.0` / `25.99.99`; macOS is pinned to 25G241.
+Apple's driver uses (RB-W1 §2.1), plus Lilu (`as.vit9696.Lilu`). The Ryzentosh-EFI `Kernel/Add` entry sets `MinKernel` /
+`MaxKernel` = `25.0.0` / `25.99.99` (OpenCore fields); macOS is pinned to 25G241.
 
-Trade-off, accepted on the owner's "one binary" decision: a crash in one part takes down the whole kext. That is the same
-as Apple's single-binary core driver.
+**Coupling, stated plainly.** One binary links IO80211Family and Lilu together. If a Family symbol it imports disappears
+or Lilu is missing, the kext doesn't load at all and Bluetooth goes with Wi-Fi; no probe-time guard can run then. The
+personalities only isolate the *runtime* failures: the Wi-Fi personality's guard (component 3) checks an allowlist of
+build + IO80211Family/IOSkywalkFamily UUIDs first (RB-W1 §1 has the 25G241 UUID) and class sizes second, and declines
+Wi-Fi alone on a mismatch (class sizes alone miss vtable reordering). Apple does the opposite: bus, core, firmware and
+Bluetooth are separate kexts (RB-W1 §2.1). We accept this on the owner's "one binary" decision; the mitigation is the pinned
+macOS build and re-validation of the allowlist before any macOS update is approved.
 
 ### 2. Components (source layout `src/<component>/`)
 
 | # | Component | Responsibility | Built from |
 |---|---|---|---|
 | 1 | `chip` | MT7922 PCIe bring-up, WFDMA rings, MCU commands, firmware download, driver/firmware ownership, chip reset (SER) and the **reset coordinator** shared by Wi-Fi and BT (a chip reset takes BT down too) | port of mt76 `mt7921/pci.c`, `mt7921/mcu.c`, `mt792x_core.c`, `mt792x_dma.c`, `mt76_connac_mcu.c` (ISC) |
-| 2 | `wlan/mac` | TX/RX descriptors, BA reorder, rate control feedback, keys, power save, hw_scan, **channel contexts and ROC** (CNM) | mt76 `mt7921/mac.c`, `mt792x_mac.c`, `mac80211`-facing logic re-expressed (ISC) |
+| 2 | `wlan/mac` | TX/RX descriptors, BA reorder, rate control feedback, keys, power save, hw_scan, **channel contexts and ROC** (CNM) | mt76 `mt7921/mac.c`, `mt792x_mac.c` (ISC). Linux mac80211/cfg80211 (GPL-2.0-only) are study-only |
 | 3 | `io80211` | `RyzentoshWLANController`, infra interface (`IO80211InfraProtocol`), AWDL interface (`IO80211AWDLProtocol`), Skywalk queues. Our own headers generated from the 25G241 KDK, with a **class-size ABI guard** at probe (the WTLWireless pattern, ISC, re-implemented) | KDK RE (REA), Apple's class choice from AppleBCMWLANCoreMac |
-| 4 | `wlan/mlme` | 802.11 state below the Family's WCL: auth/assoc frames, RSN (WPA2-PSK, WPA3-SAE, PMF), the supplicant | OpenBSD net80211 (ISC/BSD), IEEE 802.11-2020 for SAE |
+| 4 | `wlan/mlme` | 802.11 state below the Family's WCL: auth/assoc frames, RSN (WPA2-PSK, WPA3-SAE, PMF). **Where the supplicant lives is open:** Apple's driver has `useAppleRSNSupplicant()`, `setCIPHER_KEY`, `getCUR_PMK`, `isSaeH2eEnabled`, and the Family has a 4-way-handshake timeout, so the Family may run it. W4 settles the join/key contract by RE before any supplicant code is written | OpenBSD net80211 (ISC/BSD), IEEE 802.11-2020 for SAE, only if W4 shows the driver must do it |
 | 5 | `regd` | real country and regulatory limits: CLC/SKU from the chip, 802.11d, mapping to `apple80211` locale. Needed for correct AWDL channel choice (RB-W1 §3.4) | mt76 `mt7921_mcu_set_clc` (ISC) |
-| 6 | `awdl` | **host AWDL engine**: mirrors the Family's schedule selectors (sync params, channel sequence, election, presence), executes availability windows through component 2's ROC/channel contexts, AP power-save handshake around off-channel windows, DFS and regulatory channel policy, peer data path and the peer signals the Family needs (no driver-installed routes, RB-W1 §3.4) | Apple behaviour from KDK RE; AWDL protocol facts from public research (seemoo-lab OWL papers; `owl` is study-only); MtkWireless docs as measured facts |
-| 7 | `bt` | USB firmware download (WMT) and the controller's power and reset; then IOBluetoothFamily's own USB transport drives it | port of Linux `btmtk.c` (ISC) |
-| 8 | `bt/hci` | research first (issue W8): make the controller answer the Apple vendor commands Continuity depends on (advertising, scan filters, IRK lists), e.g. by mapping to MediaTek's Microsoft-extension monitor. Only built if RB evidence shows it's needed | to be decided by W8 |
-| 9 | `bluetoothd` | **the named essential workaround**: Lilu user-space patches that make bluetoothd accept a non-Apple controller. Minimal patch set, each site matched by signature against the pinned build, fail-closed (unknown build → no patch, Bluetooth stays usable without Continuity), behind the feature flag `rzw-btd-patch` (default on), tracked by its own issue | our own RE of the 25G241 bluetoothd (REA). BlueToolFixup (BrcmPatchRAM: GitHub reports GPL-2.0) and MtkWirelessBT are study-only until the license-auditor traces them |
+| 6 | `awdl` | **host AWDL engine**: mirrors the Family's schedule selectors (sync params, channel sequence, election, presence), executes availability windows through component 2's ROC/channel contexts, AP power-save handshake around off-channel windows, DFS and regulatory channel policy, peer data path and the peer signals the Family needs (no driver-installed routes, RB-W1 §3.4) | Apple behaviour from KDK RE; AWDL protocol from seemoo-lab OWL (papers, and `owl` source: GPL-3.0-or-later in 30 of 41 files, so copyable per file); MtkWireless docs as measured facts |
+| 7 | `bt` | USB firmware download (WMT) and the controller's power and reset. After that, **bluetoothd itself drives the controller from user space** through `AppleUSBHostDeviceUserClient` / `AppleUSBHostInterfaceUserClient` on the ACL and SCO interfaces (live ioreg; the KDK's IOBluetoothFamily has no USB-transport symbols). So the kext doesn't sit in the HCI path | port of Linux `btmtk.c` (ISC) |
+| 8 | `bt/hci` | research only (issue W8): what Continuity loses when the controller refuses Apple vendor commands, and whether anything can serve them. Because the HCI path is bluetoothd ↔ USB user client, any translation would need either more bluetoothd patches or a proxy USB device. **Neither is covered by the owner's exception**, so W8 ends in an owner decision, not in code | — |
+| 9 | `bluetoothd` | **the named essential workaround**: Lilu user-space patches that make bluetoothd accept a non-Apple controller. Minimal patch set, each site matched by signature against the pinned build, fail-closed (unknown build → no patch; what bluetoothd then does with the controller is measured in W7, not assumed), behind a build-time feature flag (`RZW_BTD_PATCH`, on in releases; W7 also defines a runtime off switch that is not a boot-arg), tracked by its own issue | our own RE of the 25G241 bluetoothd (REA). BlueToolFixup (BrcmPatchRAM: GitHub reports GPL-2.0) and MtkWirelessBT are study-only until the license-auditor traces them |
 | 10 | `common` | os_log subsystem `com.ryzentosh.wireless` (categories per component), ioreg diagnostics published on demand, `IOReturn` everywhere | ours |
 
 Language: **C++ in Apple's IOKit subset only.** No Rust in the kernel: one toolchain, Apple's style, and the reviewer can
 read everything. Pure logic (firmware header parsing, AWDL schedule maths, channel and regulatory policy, patch signature
 matching, BA reorder) lives in files without kernel dependencies, so host-side unit tests in `tests/host/` can build it.
 
-Firmware: the MT7922 Wi-Fi and BT images from linux-firmware go into the bundle's `Resources/` with `LICENCE.mediatek`
-(redistribution allowed by that licence; license-auditor confirms the exact text). A Mac also ships its Wi-Fi firmware
-inside the OS (`BCMWLANFirmware*_Hashstore.kext`).
+Firmware: the MT7922 Wi-Fi and BT images from linux-firmware are **embedded in the executable** (an assembler `.incbin`
+section, as MtkWireless does), because OpenCore injects only a kext's Info.plist and executable, so bundle resources
+aren't reachable at runtime (to be confirmed in W3). `LICENCE.mediatek` ships beside the kext. The license-auditor (W11)
+rules on the exact licence text and on a firmware blob inside a GPL binary. A Mac ships its Wi-Fi firmware inside the OS
+(`BCMWLANFirmware*_Hashstore.kext`).
 
 ### 3. No boot-args, no runtime crutches
 
 - Shipped code reads no tuning boot-args. Debug knobs exist only in DEBUG builds, as ioreg properties.
 - No driver-installed routes or neighbour entries. Missing peer signals are fixed at their source (component 6).
-- The only exception is component 9, plus the two NVRAM keys bluetoothd needs for a third-party controller
-  (`bluetoothInternalControllerInfo`, `bluetoothExternalDongleFailed`, set in Ryzentosh-EFI). Both are part of the same
-  named workaround. Its tracking issue documents why a Mac doesn't need it.
+- The only exception is component 9, the bluetoothd patch. Its tracking issue documents why a Mac doesn't need it.
+- The two NVRAM keys today's EFI sets for MtkWirelessBT (`bluetoothInternalControllerInfo` = 14 zero bytes,
+  `bluetoothExternalDongleFailed` = `00`) are **not** part of the exception. They are legacy config that W9 must justify
+  or remove: RB-W1 §4.3 suspects the zeroed controller info in the `Unknown chipset 0` relaunch. Widening the exception
+  would need the owner.
 
 ### 4. License plan
 
@@ -98,9 +108,12 @@ inside the OS (`BCMWLANFirmware*_Hashstore.kext`).
 |---|---|---|
 | Linux mt76 (`mt7921/*`, `mt792x_*`, `mt76_connac*`), Linux `btmtk.c` (ISC, v6.18) | port | keep copyright + ISC text in `NOTICE.md`; `PROVENANCE.md` row per file (commit, path, function) |
 | OpenBSD net80211 / mwx(4) (ISC/BSD) | port | the same |
-| WTLWireless (ISC), mt7925-macos (BSD-3-Clause-Clear) | port patterns, mostly ideas; copy only with notices | the same |
+| WTLWireless (ISC), mt7925-macos (BSD-3-Clause-Clear), owly (MIT) | port patterns, mostly ideas; copy only with notices | the same |
+| owl (seemoo-lab) | copy/port files that say GPL-3.0-or-later (30 of 41); check the rest per file. The control-plane registry entry (`study-only`) is stale | keep notices |
+| Lilu (BSD-3-Clause; `plugin_start.cpp` is compiled into the plugin) | link and compile its plugin glue | BSD notice in `NOTICE.md` |
+| Linux mac80211, cfg80211, `ieee80211.h` (GPL-2.0-only) | study only | — |
 | AirportMtkWlan | copy only files with their own GPL-3.0-compatible SPDX line, after the license-auditor traces them; otherwise study | per file |
-| MtkWireless Wi-Fi (incl. its GPL-2.0-or-later AWDL files, which depend on GPL-2.0-only code), MtkWirelessBT C++ (zxystd/laobamac lineage), BrcmPatchRAM/BlueToolFixup, SimpleMtkWlan, AirportMtk-AWDL/-macOS, owl | **study only**: facts with citations, then our own code | none in our tree |
+| MtkWireless Wi-Fi (incl. its GPL-2.0-or-later AWDL files, which depend on GPL-2.0-only code), MtkWirelessBT C++ (zxystd/laobamac lineage), BrcmPatchRAM/BlueToolFixup, SimpleMtkWlan, AirportMtk-AWDL/-macOS | **study only**: facts with citations, then our own code | none in our tree |
 | `Airport/*` RE headers from the itlwm line | **not used**; we generate our own from the KDK | — |
 | Apple binaries | RE facts only (names, offsets, behaviour, build) | never redistribute |
 | MediaTek firmware | bundled with `LICENCE.mediatek` | notice |
@@ -124,14 +137,17 @@ tests run on each candidate boot.
 
 | Matrix row | Parity target (a real Mac) | Device test | Pass |
 |---|---|---|---|
-| Wi-Fi | Native Wi-Fi menu, join WPA2/WPA3, 802.11ax 80 MHz | `networkQuality -v` ×3, `wdutil info`, 30-min gateway ping, 1-h idle | ≥ 97.9/50.7 Mbps, ≥ 308 RPM, Tx ≥ 867, 0 % loss, no link drop |
+| Wi-Fi | Native Wi-Fi menu, join WPA2/WPA3, 802.11ax 80 MHz | A/B against MtkWireless 1.1.3 in the same session: LAN `iperf3` to a wired host (median of 5 × 30 s each way), `networkQuality -v` ×5 (the WAN caps downlink near 95–98 Mbps, so it only catches regressions), `wdutil info`, 30-min gateway ping, 1-h idle | iperf3 medians ≥ 1.1.3 − 5 %, networkQuality responsiveness median ≥ 1.1.3 − 10 %, Tx rate ≥ 867, 0 % ping loss, no link drop |
 | Wi-Fi on DFS AP | Joins and stays on ch 52 | the same on ch 52 | the same |
 | AirDrop | Both ways while associated, also on a DFS AP | 10 photos + one 1 GB file each way, AP on ch 52 and on ch 36–48 | 20/20 small, both large; no AP disassociation (`log` + gateway ping) |
 | Handoff | Safari tab both ways | 10 tries each way | ≥ 19/20 |
 | Universal Clipboard | Text and image both ways | 10 copies each way, link type logged | ≥ 19/20 |
 | AirPlay to Mac | Music, video, mirroring | 5 min each | no drop |
 | Continuity Camera (wireless) | iPhone as webcam without a cable | FaceTime preview 5 min | image, no drop (needs GPU decode, see RB-W1 §4.4) |
-| Sidecar / Universal Control / iPhone Mirroring | where the Mac model supports them (MacPro7,1: check per feature) | 10 min each | works like on a Mac of the same model |
+| Sidecar, Universal Control | supported on MacPro7,1 with an iPad on the same Apple ID | 10 min each (needs an iPad; owner's choice) | connects from Control Center, no drop in 10 min, input works |
+| iPhone Mirroring | needs a Mac with Apple silicon or a T2 chip; MacPro7,1 has a T2, but this machine doesn't, so likely n/a (ADR-0003: no forged T2) | check that macOS offers it at all | documented either way |
+| Auto Unlock | needs an Apple Watch | only if the owner has one | unlocks 5/5 |
+| AirPlay peer-to-peer | iPhone → Mac with the Mac not on the iPhone's network | 5 min video | no drop |
 | Instant Hotspot | Mac joins the iPhone's hotspot from the Wi-Fi menu | 5 joins | 5/5 |
 | Bluetooth: accessories | AirPods A2DP/AAC, HFP mic, keyboard/mouse | 30 min audio, 5-min call | no drop, wideband mic |
 | Bluetooth: iPhone | Pair and connect from either side | pair, unpair, re-pair ×3 | 3/3, bluetoothd never relaunches |
@@ -147,16 +163,16 @@ class-size table, bluetoothd signature matcher against the pinned binary's bytes
 
 | # | Title | Depends on |
 |---|---|---|
-| W2 | IO80211/IOSkywalk 25G241 ABI: generate headers from the KDK, class-size guard, host test | — (REA) |
+| W2 | IO80211/IOSkywalk 25G241 ABI: generate headers from the KDK; guard = build + Family UUID allowlist, then class sizes; host test | — (REA) |
 | W3 | MT7922 chip bring-up: PCIe, WFDMA, MCU, Wi-Fi firmware download, reset coordinator (mt76 port) | W2 for the kext shell |
-| W4 | Infra STA: scan, join WPA2/WPA3-SAE/PMF, Skywalk data path; meet the 1.1.3 baseline | W3 |
+| W4 | Infra STA: RE the Family's join/key contract first (who runs the 4-way handshake and SAE), then scan, join WPA2/WPA3-SAE/PMF, Skywalk data path; meet the 1.1.3 baseline | W3 |
 | W5 | Regulatory: real country/CLC, `apple80211` locale | W3 |
 | W6 | AWDL engine: host schedule over ROC, AP power-save handshake, DFS-AP case, peer data path without routes (RB-W1 Q2/Q3) | W4, W5 |
 | W7 | Bluetooth: btmtk firmware loader for `0489:e0e2` + bluetoothd patch (named workaround, flag `rzw-btd-patch`, fail-closed) from our own 25G241 RE | — |
-| W8 | RB: Apple Bluetooth vendor commands that Continuity needs, and whether the MediaTek controller can serve them (RB-W1 Q4) | W7 |
-| W9 | iPhone Bluetooth connection: root cause from an HCI trace (owner test T2) and the `Unknown chipset 0` relaunch (RB-W1 Q5) | owner test T2 |
+| W8 | RB: Apple Bluetooth vendor commands that Continuity needs, what bluetoothd does when they fail, and the options (each needs an owner decision, component 8) (RB-W1 Q4) | W7 |
+| W9 | iPhone Bluetooth connection: root cause from an HCI trace (owner test T2), the `Unknown chipset 0` relaunch (RB-W1 Q5), and whether the two legacy NVRAM keys are needed | owner test T2 |
 | W10 | On-device test scripts for the table above (networkQuality, ping, AirDrop/Clipboard trial logger, BT log counters) | — |
-| W11 | Licence audit: AirportMtkWlan per-file provenance, MtkWirelessBT/BlueToolFixup lineage, `LICENCE.mediatek` text | — |
+| W11 | Licence audit: AirportMtkWlan per-file provenance (incl. whether GPLv2 §9 lets unversioned itlwm-lineage files be upgraded), MtkWirelessBT/BlueToolFixup lineage, owl per file, `LICENCE.mediatek` and a firmware blob in a GPL binary | — |
 
 Owner tests that need no reboot and can run now (RB-W1 §4): **T1** AirDrop with the AP on a non-DFS channel, **T2** iPhone
 pairing with an HCI trace, **T3** Clipboard tries with link-type logging.

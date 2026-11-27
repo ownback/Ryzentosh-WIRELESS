@@ -18,7 +18,7 @@ Author: Project Lead, claude-opus-5-5/high, 2026-11-27. Status: research finding
 3. **AirDrop "discovery yes, transfer never": root cause found (high confidence, needs one confirming test).** The AP is on
    DFS channel 52. MtkWireless never uses DFS channels for AWDL, and the boot-arg `amtk_awdl_offchan=0` keeps AWDL on the
    AP's channel. So AWDL has no channel it may use while associated. Discovery runs over BLE and works; the AWDL data path
-   never opens.
+   never opens. The live 1.1.3 counters agree (§4.1). Why AirportMtkWlan showed the same symptom is not explained.
 4. **Handoff / Universal Clipboard flakiness:** not proven. The evidence points at Bluetooth LE advertising and scan-filter
    failures that are the same on every Wi-Fi driver tested (the Bluetooth kext was the same in all three tests), plus the
    missing AWDL data path from point 3.
@@ -80,29 +80,33 @@ The most-used imports by symbol count are `IO80211SkywalkInterface` (119), `IO80
 
 ### 2.3 Where AWDL runs on a Mac
 
-- `AppleBCMWLANProximityInterface` implements 137 methods. Among them are 49 AWDL selectors that hand state to the firmware:
+- `AppleBCMWLANProximityInterface` implements 137 methods. Among them are 49 AWDL selectors (28 set, 21 get) that hand state to the firmware:
   `setAWDL_SYNC_PARAMS`, `setAWDL_SYNCHRONIZATION_CHANNEL_SEQUENCE`, `setAWDL_SYNC_FRAME_TEMPLATE`, `setAWDL_ELECTION_*`,
   `setAWDL_MASTER_CHANNEL`, `setAWDL_PRESENCE_MODE`, `setAWDL_ENCRYPTION_KEYS`, `setAWDL_DFSP_CONFIG`,
   `setAWDL_DFSP_UCSA_CONFIG`, `setAWDL_PEER_TRAFFIC_REGISTRATION`, `setAWDL_OOB_*`, and others. There are also
   `setLLW_PARAMS`, `setPSF_DWELL` and `setP2P_COEX_PROTECTION`. Its strings include `wlan.awdl.params` and
   `wlan.dfsproxy.enabled`.
-- So on a Mac, the host (Family + wifip2pd/sharingd) decides *what* the AWDL schedule is, and the **chip firmware executes
-  it**: availability windows, channel sequence and sync frames. The infra association keeps running beside it.
+- So on a Mac, the host (Family + wifip2pd/sharingd) decides *what* the AWDL schedule is, and, **inferred from these
+  selector names and strings, not yet from code**, the chip firmware executes it: availability windows, channel sequence
+  and sync frames. The infra association keeps running beside it. RE question Q7 confirms it.
 - **DFS proxy** (AWDL on a DFS channel) exists: IO80211Family has `IO80211P2PDFSProxyManager` and the string
   `DFS Proxy (AWDL on DFS) is supported on this device`. Its activation strings tie it to AirPlay: `received a UMI with
-  request to jumpstart DFSProxy, we are not an ATV !` and `… we are not Airplaying !`. So for AirDrop with the AP on a DFS
-  channel, a Mac's AWDL uses a non-DFS channel. The infra link stays on the DFS channel, and the two share the radio in
+  request to jumpstart DFSProxy, we are not an ATV !` and `… we are not Airplaying !`. So, **inferred from strings (Q7)**,
+  for AirDrop with the AP on a DFS channel a Mac's AWDL uses a non-DFS channel. The infra link stays on the DFS channel, and the two share the radio in
   time. **Parity target:** AirDrop works while associated on a DFS channel, without disassociation and without a boot-arg.
 
 ### 2.4 Bluetooth on a Mac
 
-- Macs use Apple/Broadcom controllers. bluetoothd sends many Broadcom/Apple vendor-specific commands: 328 distinct
+- Macs use Apple/Broadcom controllers. bluetoothd sends many Broadcom/Apple vendor-specific commands: over 300 distinct
   `BD_VSC_*`/`BT_VSC_*` names in the 25G241 binary, for example `BD_VSC_LE_META_ADD_ADV_MATCHING_RULE`,
   `BD_VSC_LE_META_ADV_PCF_SERVICE_UUID`, `BD_VSC_LE_META_ENA_FILTERING_FEATURES`,
   `BD_VSC_OLYMPIC_ADV_DUPLICATE_FILTER_BYPASS_CONFIG` and `BD_VSC_LE_META_ADD_IRK_TO_LIST`.
 - For a non-Apple USB controller bluetoothd logs `Found external Bluetooth dongle -- setting chipset to
   THIRD_PARTY_DONGLE`. It reads the NVRAM keys `bluetoothInternalControllerInfo` and `bluetoothExternalDongleFailed`.
   `Unknown chipset %d` is a fault path. (All of these strings are in bluetoothd.)
+- bluetoothd is also the HCI transport: on this machine it holds `AppleUSBHostDeviceUserClient` and
+  `AppleUSBHostInterfaceUserClient` on the controller's ACL and SCO interfaces (ioreg), and the KDK's IOBluetoothFamily
+  has no USB-transport symbols. So a kext can't sit in the HCI path without more bluetoothd patches or a proxy device.
 - The live controller reports `Chipset: THIRD_PARTY_DONGLE`, `Transport: USB`, firmware `v9735 c9236`, and supported
   services `HFP AVRCP A2DP HID Braille LEA AACP GATT SerialPort`.
 
@@ -151,7 +155,7 @@ resets. A Tx rate of 432 is half of 867, which suggests one spatial stream on Ai
   it (section 6, Q2), not copy the route hack.
 - `CountryLocale.hpp` documents that the firmware reports country `00`. With locale FCC, macOS planned AWDL on US channel
   149 while the AP was on 44 (Italy). A real regulatory domain is therefore an AWDL-correctness requirement as well as a
-  legal one. On this machine 1.1.3 reports `MTKWiFiCountryCode = DE` from 802.11d (ioreg).
+  legal one. On this machine 1.1.3 reports a real country code learned from the AP's 802.11d element (ioreg).
 - The boot-args (`amtk_awdl_offchan`, `amtk_awdl_idle_gap`, `amtk_awdl_infra_bw`, …) are tuning knobs. Under the parity
   rule they are not acceptable in shipped code.
 
@@ -169,21 +173,27 @@ Evidence chain, MtkWireless at `424f976`:
    `AirportMtkAwdlInterface.cpp:2533–2544`: with it set, "AWDL only uses the AP's channel while associated", and the
    planner backs off when no window falls on it.
 3. The live AP is on channel 52 (`logs-local/ewifi*/…airport.txt`), and `amtk_awdl_offchan=0` is in the boot-args.
+4. Live counters on `AirportMtkAwdlInterface`, MtkWireless 1.1.3, this boot (ioreg, ~22:55): `MTKAWDLInfraSlotChannel =
+   52`, `MTKAWDLAWStartNotifications = 0`, `MTKAWDLDataTxSubmitted = 0`, `MTKAWDLDataTxExpired = 255`,
+   `MTKAWDLNativeTxPackets = 257`. AWDL is pinned to the DFS AP channel, no availability window ever started, and every
+   queued AWDL data frame expired unsent.
 
 So AWDL has no usable channel: the AP channel is DFS (refused), and every other channel is forbidden by the boot-arg.
 AirDrop discovery is BLE plus AWDL service announcements, and the BLE half works. The transfer needs AWDL data frames and
-never starts. This matches the owner's observation on both drivers. AirportMtkWlan was tested with the same AP and its
-own DFS handling, which has not been checked. MtkWireless's own docs state the limit: "DFS channels (52–144): never used
-for AWDL", and `amtk_awdl_offchan=0`: "AirDrop to phones on other channels fails" (`docs/WIFI.md`).
+never starts. This matches the owner's observation on MtkWireless 1.1.1, and the counters above show it on 1.1.3.
+AirportMtkWlan showed the same symptom with the same AP; its DFS and off-channel handling has not been checked, so for that
+driver the cause is **unexplained**. MtkWireless's own docs state the limit: "DFS channels (52–144): passive scan only,
+never used for AWDL" (`README.md:69`), and `amtk_awdl_offchan=0`: "AirDrop to phones on other channels fails"
+(`docs/WIFI.md`).
 
-What a Mac does instead: AWDL runs on a non-DFS channel (44 in ETSI countries, 149 elsewhere) while the infra link stays on
-52, and firmware shares the radio between them (section 2.3).
+What a Mac does instead (inferred, §2.3 and Q7): AWDL runs on a non-DFS channel (44 or 149 depending on the regulatory
+domain) while the infra link stays on 52, and firmware shares the radio between them.
 
 Confirming test, owner's choice (no reboot needed): **T1**, move the AP to a non-DFS channel (36–48) for one test and
 send a photo both ways with AirDrop. If it transfers, the cause is confirmed. The driver-side fix is the WIRELESS AWDL
 engine (ADR-0001), not a boot-arg. Removing `amtk_awdl_offchan=0` from the legacy kext would be a separate EFI change
-(WIRELESS#1). MtkWireless's own warning about it ("unannounced channel switches got the client disassociated") is why it
-was set.
+(WIRELESS#1). It was set because leaving the AP channel without a power-save handshake got the client disassociated
+(WIRELESS#1; MtkWireless's off-channel handling starts at `MtkMwx.cpp:11170`).
 
 ### 4.2 Handoff and Universal Clipboard: work, but fail often on every driver (medium confidence, not proven)
 
@@ -264,3 +274,8 @@ local in the control plane's `.private/` because it contains device addresses.
   btmtk for MT7921/7922) provide the same result?
 - **Q5 (W9):** the bluetoothd `Unknown chipset` path and what triggers it after a controller reset.
 - **Q6 (later):** whether macOS 26 Continuity features use NAN (`IO80211NAN*` classes are present) anywhere a Mac would.
+- **Q7 (W6):** confirm from code that AppleBCMWLANCoreMac hands the AWDL schedule to firmware (follow `setAWDL_SYNC_PARAMS`
+  and `setAWDL_SYNCHRONIZATION_CHANNEL_SEQUENCE` into the command path), and which channel a Mac's AWDL uses with the AP on
+  a DFS channel.
+- **Q8 (W4):** the join/key contract: does the Family (`useAppleRSNSupplicant`, its 4-way-handshake timeout) or the driver
+  run the 4-way handshake and SAE on 25G241?
